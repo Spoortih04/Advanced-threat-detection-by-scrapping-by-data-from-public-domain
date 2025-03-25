@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Criminal Detection System</title>
+</head>
+<body>
+    <h1>Criminal Detection System</h1>
+    <div>
+        <h2>Live Camera Feed</h2>
+        <video id="video" width="640" height="480" autoplay></video>
+    </div>
+    <p id="result"></p>
+
+    <script>
+        // Access the camera and stream video to the page
+        const video = document.getElementById("video");
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then((stream) => {
+                video.srcObject = stream;
+            })
+            .catch((err) => console.error("Error accessing the camera:", err));
+
+        let lastStatus = "";
+        let lastName = "";
+
+        // Function to capture and detect faces continuously
+        function captureAndDetect() {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            const imageData = canvas.toDataURL('image/jpeg'); // Convert to base64 image
+
+            // Send the captured image to the Flask server for detection
+            fetch("http://127.0.0.1:5000/capture_and_detect", {
+                method: "POST",
+                body: JSON.stringify({ image: imageData }), // Send the base64 image data
+                headers: {
+                    "Content-Type": "application/json"  // Set content type as JSON
+                }
+            })
+            .then((response) => response.json())
+            .then((data) => {
+                if (data.status === "Match Found") {
+                    if (lastStatus !== "Match Found" || lastName !== data.name) {
+                        document.getElementById("result").innerText = `Match Found:  ${data.name}`;
+                        lastStatus = "Match Found";
+                        lastName = data.name;
+                    }
+                } else if (data.status === "No Match Found") {
+                    if (lastStatus !== "No Match Found") {
+                        document.getElementById("result").innerText = "No Match Found";
+                        lastStatus = "No Match Found";
+                        lastName = "";
+                    }
+                }
+            })
+            .catch((err) => {
+                console.error("Error detecting face:", err);
+                document.getElementById("result").innerText = "Error detecting face";
+            });
+        }
+
+        // Continuously capture and detect faces every 2 seconds
+        setInterval(captureAndDetect, 2000);
+    </script>
+</body>
+</html>
